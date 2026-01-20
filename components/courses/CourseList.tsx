@@ -14,6 +14,7 @@ interface Course {
     tags?: string[];
     lessonCount: number;
     completedCount: number;
+    firstLessonId?: string;
 }
 
 interface CourseListProps {

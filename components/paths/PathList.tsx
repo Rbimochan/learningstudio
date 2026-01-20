@@ -8,9 +8,10 @@ import { FolderOpen } from 'lucide-react';
 interface Path {
     id: string;
     title: string;
-    description: string | null;
+    description?: string | null;
     courseCount: number;
     progress: number;
+    firstLessonId?: string;
 }
 
 interface PathListProps {
@@ -51,6 +52,7 @@ export function PathList({ paths, loading = false }: PathListProps) {
                     description={path.description}
                     courseCount={path.courseCount}
                     progress={path.progress}
+                    firstLessonId={path.firstLessonId}
                 />
             ))}
         </div>

@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../../lib/store';
+import { logoutAction } from '../../lib/auth-actions';
 import {
     LayoutDashboard,
     BookOpen,
@@ -14,21 +15,26 @@ import {
     Moon,
     Search,
     Bell,
-    User as UserIcon
+    User as UserIcon,
+    Play
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from './Components';
 
 export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-    const { state, logout } = useStore();
     const pathname = usePathname();
 
     const menuItems = [
         { label: 'Learning Paths', icon: LayoutDashboard, path: '/paths' },
         { label: 'My Courses', icon: BookOpen, path: '/paths' },
+        { label: 'Course Play', icon: Play, path: '/studio' },
         { label: 'Settings', icon: Settings, path: '/settings' },
     ];
+
+    const handleLogout = async () => {
+        await logoutAction();
+    };
 
     return (
         <>
@@ -57,7 +63,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
                             const isActive = pathname === item.path;
                             return (
                                 <Link
-                                    key={item.path}
+                                    key={`${item.path}-${item.label}`}
                                     href={item.path}
                                     onClick={() => onClose()}
                                     className={`flex items-center gap-4 px-5 py-4 rounded-2xl font-semibold transition-all ${isActive
@@ -74,7 +80,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
 
                     <div className="p-6 border-t border-slate-200 dark:border-white/5">
                         <button
-                            onClick={logout}
+                            onClick={handleLogout}
                             className="flex items-center gap-4 w-full px-5 py-4 rounded-2xl text-slate-500 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-600 transition-colors font-semibold"
                         >
                             <LogOut size={22} />
@@ -88,7 +94,7 @@ export const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ is
 };
 
 export const Navbar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar }) => {
-    const { state, toggleTheme } = useStore();
+    const { theme, toggleTheme } = useStore();
 
     return (
         <header className="sticky top-0 z-30 flex items-center justify-between h-20 px-6 bg-white/80 dark:bg-[#050a14]/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5">
@@ -114,7 +120,7 @@ export const Navbar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
                     onClick={toggleTheme}
                     className="p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl transition-colors border dark:border-white/5"
                 >
-                    {state.theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
+                    {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
                 </button>
                 <button className="p-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 rounded-2xl relative border dark:border-white/5">
                     <Bell size={22} />
@@ -122,11 +128,11 @@ export const Navbar: React.FC<{ onOpenSidebar: () => void }> = ({ onOpenSidebar 
                 </button>
                 <div className="flex items-center gap-4 ml-4 pl-6 border-l border-slate-200 dark:border-white/10">
                     <div className="text-right hidden sm:block">
-                        <p className="text-sm font-bold dark:text-white leading-none">{state.user?.name}</p>
+                        <p className="text-sm font-bold dark:text-white leading-none">user</p>
                         <p className="text-xs text-blue-500 font-bold uppercase tracking-widest mt-1">Level 12</p>
                     </div>
                     <div className="w-11 h-11 brand-gradient rounded-2xl flex items-center justify-center text-white font-bold border border-white/10 shadow-lg shadow-blue-500/20">
-                        {state.user?.name?.charAt(0).toUpperCase()}
+                        U
                     </div>
                 </div>
             </div>

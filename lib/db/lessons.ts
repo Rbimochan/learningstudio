@@ -3,14 +3,10 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { LessonStatus } from './progress';
 
-export interface Lesson {
-    id: string;
-    title: string;
-    type: string;
-    source: string;
-    course_id: string;
-    order_index: number;
-}
+import { Database } from '@/types/database.types';
+
+export type Lesson = Database['public']['Tables']['lessons']['Row'];
+
 
 export interface LessonWithStatus extends Lesson {
     status: LessonStatus;
@@ -98,4 +94,25 @@ export async function getLessonsForCourseWithStatus(courseId: string): Promise<L
     );
 
     return lessonsWithStatus;
+}
+
+/**
+ * Create a new lesson
+ */
+export async function createLesson(input: {
+    title: string;
+    type: string;
+    source: string;
+    course_id: string;
+    order_index: number;
+}): Promise<Lesson | null> {
+    const supabase = await createSupabaseServerClient();
+
+    const { data } = await supabase
+        .from('lessons')
+        .insert(input)
+        .select()
+        .single();
+
+    return data;
 }

@@ -41,7 +41,7 @@ export function StudioClientPage({ lesson: initialLesson, allLessons, context }:
     // Update local state if props change
     useEffect(() => {
         setLesson(initialLesson);
-        
+
         // Track course progress whenever lesson changes
         if (initialLesson.course_id) {
             upsertCourseProgress(initialLesson.course_id, initialLesson.id);

@@ -1,31 +1,27 @@
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { PathList } from '@/components/paths/PathList';
-import { getPathsForUser } from '@/lib/db/paths';
+import { getPathsForUser, getCourseCountForPath, getFirstLessonForPath } from '@/lib/db/paths';
 import { calculatePathProgress } from '@/lib/db/progress';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export default async function PathsPage() {
     const rawPaths = await getPathsForUser();
-    const supabase = await createSupabaseServerClient();
 
     // Enhance paths with stats
-    // We can do this in parallel
     const paths = await Promise.all(
         rawPaths.map(async (path) => {
-            // Get course count
-            const { data: pathCourses } = await supabase
-                .from('path_courses')
-                .select('course_id')
-                .eq('path_id', path.id);
-
-            const courseCount = pathCourses?.length || 0;
-            const progress = await calculatePathProgress(path.id);
+            // Get course count, progress, and first lesson from data layer
+            const [courseCount, progress, firstLessonId] = await Promise.all([
+                getCourseCountForPath(path.id),
+                calculatePathProgress(path.id),
+                getFirstLessonForPath(path.id)
+            ]);
 
             return {
                 ...path,
                 courseCount,
-                progress
+                progress,
+                firstLessonId: firstLessonId ?? undefined
             };
         })
     );

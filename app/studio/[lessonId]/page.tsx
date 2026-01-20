@@ -1,3 +1,4 @@
+
 import { getLessonById, getLessonsForCourseWithStatus } from '@/lib/db/lessons';
 import { getLessonContext } from '@/lib/db/context';
 import { StudioClientPage } from '@/components/studio/StudioClientPage';
