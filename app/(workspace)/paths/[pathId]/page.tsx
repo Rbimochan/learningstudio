@@ -1,20 +1,11 @@
-'use client';
-
-import { Plus, ArrowLeft, Edit } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { notFound } from 'next/navigation';
 import { CourseList } from '@/components/courses/CourseList';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
-import { LoadingState } from '@/components/ui/LoadingState';
-import { getCourseStats } from '@/lib/utils/progress';
-
-interface PathData {
-    id: string;
-    title: string;
-    description: string | null;
-}
+import { getPathById } from '@/lib/db/paths';
+import { getCoursesForPath } from '@/lib/db/courses';
+import { getCourseStats } from '@/lib/db/progress';
 
 interface CourseWithStats {
     id: string;
@@ -27,105 +18,42 @@ interface CourseWithStats {
     completedCount: number;
 }
 
-export default function PathDetailPage() {
-    const params = useParams();
-    const pathId = params.pathId as string;
-    const [path, setPath] = useState<PathData | null>(null);
-    const [courses, setCourses] = useState<CourseWithStats[]>([]);
-    const [loading, setLoading] = useState(true);
-    const supabase = createClient();
+export default async function PathDetailPage({ params }: { params: Promise<{ pathId: string }> }) {
+    const { pathId } = await params;
 
-    useEffect(() => {
-        fetchPathData();
-    }, [pathId]);
+    // allow parallel fetching
+    const pathPromise = getPathById(pathId);
+    const coursesPromise = getCoursesForPath(pathId);
 
-    async function fetchPathData() {
-        setLoading(true);
-
-        // Fetch path data
-        const { data: pathData } = await supabase
-            .from('learning_paths')
-            .select('*')
-            .eq('id', pathId)
-            .single();
-
-        if (!pathData) {
-            setLoading(false);
-            return;
-        }
-
-        setPath(pathData);
-
-        // Fetch courses in this path
-        const { data: pathCourses } = await supabase
-            .from('path_courses')
-            .select('course_id, order_index')
-            .eq('path_id', pathId)
-            .order('order_index');
-
-        if (!pathCourses || pathCourses.length === 0) {
-            setLoading(false);
-            return;
-        }
-
-        const courseIds = pathCourses.map(pc => pc.course_id);
-
-        // Fetch course details
-        const { data: coursesData } = await supabase
-            .from('courses')
-            .select('*')
-            .in('id', courseIds);
-
-        if (!coursesData) {
-            setLoading(false);
-            return;
-        }
-
-        // Get stats for each course
-        const coursesWithStats = await Promise.all(
-            coursesData.map(async (course) => {
-                const stats = await getCourseStats(course.id);
-                const meta = course.meta as any || {};
-
-                return {
-                    id: course.id,
-                    pathId,
-                    title: course.title,
-                    description: course.description,
-                    level: meta.level,
-                    tags: meta.tags || [],
-                    lessonCount: stats.lessonCount,
-                    completedCount: stats.completedCount
-                };
-            })
-        );
-
-        // Sort by order_index
-        const sortedCourses = coursesWithStats.sort((a, b) => {
-            const aIndex = pathCourses.find(pc => pc.course_id === a.id)?.order_index || 0;
-            const bIndex = pathCourses.find(pc => pc.course_id === b.id)?.order_index || 0;
-            return aIndex - bIndex;
-        });
-
-        setCourses(sortedCourses);
-        setLoading(false);
-    }
-
-    if (loading) {
-        return (
-            <div className="p-8 max-w-7xl mx-auto">
-                <LoadingState message="Loading path..." />
-            </div>
-        );
-    }
+    const [path, courses] = await Promise.all([pathPromise, coursesPromise]);
 
     if (!path) {
-        return (
-            <div className="p-8 max-w-7xl mx-auto">
-                <p className="text-center text-slate-500">Path not found</p>
-            </div>
-        );
+        notFound();
     }
+
+    // Sort by order_index (done in getCoursesForPath, but standard lists might not have meta?)
+    // Actually getCoursesForPath selects `courses(*)` ordered by order_index.
+    // But my types in code might need adjustment.
+    // `getCoursesForPath` returns `Course[]`.
+
+    // Enhance courses with stats
+    const coursesWithStats = await Promise.all(
+        courses.map(async (course: any) => {
+            const stats = await getCourseStats(course.id);
+            const meta = course.meta || {};
+
+            return {
+                id: course.id,
+                pathId,
+                title: course.title,
+                description: course.description,
+                level: meta.level,
+                tags: meta.tags || [],
+                lessonCount: stats.lessonCount,
+                completedCount: stats.completedCount
+            };
+        })
+    );
 
     return (
         <div className="p-8 max-w-7xl mx-auto">
@@ -161,7 +89,8 @@ export default function PathDetailPage() {
                 </div>
             </div>
 
-            <CourseList courses={courses} pathId={pathId} loading={false} />
+            <CourseList courses={coursesWithStats} pathId={pathId} loading={false} />
         </div>
     );
 }
+

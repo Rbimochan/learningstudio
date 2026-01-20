@@ -4,44 +4,33 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { createPath } from '@/lib/db/paths';
 
 export default function NewPathPage() {
     const router = useRouter();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
-    const supabase = createClient();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                alert('You must be logged in to create a path');
-                setLoading(false);
-                return;
-            }
+            const path = await createPath({
+                title,
+                description: description || undefined
+            });
 
-            const { data, error } = await supabase
-                .from('learning_paths')
-                .insert({
-                    user_id: user.id,
-                    title,
-                    description: description || null
-                })
-                .select()
-                .single();
-
-            if (error) {
-                console.error('Error creating path:', error);
-                alert('Failed to create path. Please try again.');
-            } else if (data) {
+            if (path) {
                 // Redirect to the new path detail page
-                router.push(`/paths/${data.id}`);
+                router.push(`/paths/${path.id}`);
+            } else {
+                alert('Failed to create path. Please ensure you are logged in.');
             }
+        } catch (error) {
+            console.error('Error creating path:', error);
+            alert('Failed to create path. Please try again.');
         } finally {
             setLoading(false);
         }

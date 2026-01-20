@@ -1,33 +1,26 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { getNotesForLesson, upsertNoteForLesson } from '@/lib/db/notes'
 import { Save, Loader2 } from 'lucide-react'
 
 export function NotesPanel({ lessonId }: { lessonId: string }) {
     const [content, setContent] = useState('')
     const [noteId, setNoteId] = useState<string | null>(null)
     const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved'>('loading')
-    const supabase = createClient()
-
     const fetchNote = useCallback(async () => {
         setStatus('loading')
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const { data } = await supabase
-            .from('notes')
-            .select('*')
-            .eq('lesson_id', lessonId)
-            .eq('user_id', user.id)
-            .single()
-
-        if (data) {
-            setContent(data.content)
-            setNoteId(data.id)
+        try {
+            const data = await getNotesForLesson(lessonId)
+            if (data) {
+                setContent(data.content)
+                setNoteId(data.id)
+            }
+        } catch (error) {
+            console.error('Failed to fetch note:', error)
         }
         setStatus('idle')
-    }, [lessonId, supabase])
+    }, [lessonId])
 
     useEffect(() => {
         fetchNote()
@@ -37,33 +30,15 @@ export function NotesPanel({ lessonId }: { lessonId: string }) {
         if (!content.trim()) return
 
         setStatus('saving')
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-
-        const noteData = {
-            lesson_id: lessonId,
-            user_id: user.id,
-            content,
-            updated_at: new Date().toISOString()
-        }
-
-        if (noteId) {
-            await supabase
-                .from('notes')
-                .update(noteData as any)
-                .eq('id', noteId)
-        } else {
-            const { data } = await supabase
-                .from('notes')
-                .insert(noteData as any)
-                .select()
-                .single()
-
+        try {
+            const data = await upsertNoteForLesson(lessonId, content, noteId)
             if (data) setNoteId(data.id)
+            setStatus('saved')
+            setTimeout(() => setStatus('idle'), 2000)
+        } catch (error) {
+            console.error('Failed to save note:', error)
+            setStatus('idle')
         }
-
-        setStatus('saved')
-        setTimeout(() => setStatus('idle'), 2000)
     }
 
     // Auto-save logic (optional, but good UX)
@@ -83,8 +58,8 @@ export function NotesPanel({ lessonId }: { lessonId: string }) {
                     onClick={saveNote}
                     disabled={status === 'saving' || status === 'loading'}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${status === 'saved'
-                            ? 'text-green-600 bg-green-50'
-                            : 'text-white bg-black hover:bg-gray-800 disabled:opacity-50'
+                        ? 'text-green-600 bg-green-50'
+                        : 'text-white bg-black hover:bg-gray-800 disabled:opacity-50'
                         }`}
                 >
                     {status === 'saving' ? (

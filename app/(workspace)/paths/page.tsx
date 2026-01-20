@@ -1,76 +1,34 @@
-'use client';
-
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { PathList } from '@/components/paths/PathList';
-import { calculatePathProgress } from '@/lib/utils/progress';
+import { getPathsForUser } from '@/lib/db/paths';
+import { calculatePathProgress } from '@/lib/db/progress';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-interface PathWithStats {
-    id: string;
-    title: string;
-    description: string | null;
-    courseCount: number;
-    progress: number;
-}
+export default async function PathsPage() {
+    const rawPaths = await getPathsForUser();
+    const supabase = await createSupabaseServerClient();
 
-export default function PathsPage() {
-    const [paths, setPaths] = useState<PathWithStats[]>([]);
-    const [loading, setLoading] = useState(true);
-    const supabase = createClient();
+    // Enhance paths with stats
+    // We can do this in parallel
+    const paths = await Promise.all(
+        rawPaths.map(async (path) => {
+            // Get course count
+            const { data: pathCourses } = await supabase
+                .from('path_courses')
+                .select('course_id')
+                .eq('path_id', path.id);
 
-    useEffect(() => {
-        fetchPaths();
-    }, []);
+            const courseCount = pathCourses?.length || 0;
+            const progress = await calculatePathProgress(path.id);
 
-    async function fetchPaths() {
-        setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            setLoading(false);
-            return;
-        }
-
-        // Fetch learning paths
-        const { data: learningPaths } = await supabase
-            .from('learning_paths')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-        if (!learningPaths) {
-            setLoading(false);
-            return;
-        }
-
-        // For each path, get course count and progress
-        const pathsWithStats = await Promise.all(
-            learningPaths.map(async (path) => {
-                // Get course count
-                const { data: pathCourses } = await supabase
-                    .from('path_courses')
-                    .select('course_id')
-                    .eq('path_id', path.id);
-
-                const courseCount = pathCourses?.length || 0;
-
-                // Calculate progress
-                const progress = await calculatePathProgress(path.id);
-
-                return {
-                    id: path.id,
-                    title: path.title,
-                    description: path.description,
-                    courseCount,
-                    progress
-                };
-            })
-        );
-
-        setPaths(pathsWithStats);
-        setLoading(false);
-    }
+            return {
+                ...path,
+                courseCount,
+                progress
+            };
+        })
+    );
 
     return (
         <div className="p-8 max-w-7xl mx-auto">
@@ -88,7 +46,7 @@ export default function PathsPage() {
                 </Link>
             </div>
 
-            <PathList paths={paths} loading={loading} />
+            <PathList paths={paths} loading={false} />
         </div>
     );
 }

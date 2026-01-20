@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { upsertPlaybackPosition } from '@/lib/db/progress'
 import Script from 'next/script'
 
 declare global {
@@ -22,7 +22,6 @@ export function YouTubePlayer({
 }) {
     const playerRef = useRef<any>(null)
     const [ready, setReady] = useState(false)
-    const supabase = createClient()
 
     useEffect(() => {
         // If API is already loaded
@@ -67,23 +66,12 @@ export function YouTubePlayer({
         const interval = setInterval(async () => {
             const currentTime = playerRef.current?.getCurrentTime()
             if (currentTime) {
-                const { data: { user } } = await supabase.auth.getUser()
-                if (user) {
-                    await supabase
-                        .from('progress')
-                        .upsert({
-                            lesson_id: lessonId,
-                            user_id: user.id,
-                            last_position: Math.floor(currentTime),
-                            status: 'doing',
-                            updated_at: new Date().toISOString()
-                        } as any)
-                }
+                await upsertPlaybackPosition(lessonId, currentTime)
             }
         }, 10000)
 
         return () => clearInterval(interval)
-    }, [ready, lessonId, supabase])
+    }, [ready, lessonId])
 
     return (
         <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black">
